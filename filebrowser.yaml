@@ -1,0 +1,37 @@
+services:
+  filebrowser:
+    image: 'filebrowser/filebrowser:latest'
+    environment:
+      - SERVICE_FQDN_FILEBROWSER_80
+    volumes:
+      # Mount the same volume that your WordPress uses
+      - 'wordpress_data:/srv'
+      # OR if you're still using bind mounts:
+      # - '/mnt/data/wordpress-site1:/srv'
+      -
+        type: bind
+        source: ./database.db
+        target: /database.db
+        isDirectory: false
+        content: ''
+      -
+        type: bind
+        source: ./filebrowser.json
+        target: /.filebrowser.json
+        read_only: true
+        content: |-
+          {
+            "address": "0.0.0.0",
+            "port": 80,
+            "database": "/database.db",
+            "root": "/srv"
+          }
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1:80'
+      interval: 2s
+      timeout: 10s
+      retries: 15

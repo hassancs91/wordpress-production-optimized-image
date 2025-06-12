@@ -1,0 +1,91 @@
+services:
+  wordpress:
+    image: 'wordpress:latest'
+    volumes:
+      - 'wordpress-files:/var/www/html'
+    environment:
+      - SERVICE_FQDN_WORDPRESS_80
+      - WORDPRESS_DB_HOST=mariadb
+      - WORDPRESS_DB_USER=$SERVICE_USER_WORDPRESS
+      - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+      - WORDPRESS_DB_NAME=wordpress
+    depends_on:
+      - mariadb
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1'
+      interval: 2s
+      timeout: 10s
+      retries: 10
+  mariadb:
+    image: 'mariadb:11'
+    volumes:
+      - 'mariadb-data:/var/lib/mysql'
+    environment:
+      - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=$SERVICE_USER_WORDPRESS
+      - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - '--connect'
+        - '--innodb_initialized'
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  phpmyadmin:
+    image: 'phpmyadmin/phpmyadmin:latest'
+    environment:
+      - SERVICE_FQDN_PHPMYADMIN_80
+      - PMA_HOST=mariadb
+    depends_on:
+      - mariadb
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1'
+      interval: 2s
+      timeout: 10s
+      retries: 15
+  filebrowser:
+    image: 'filebrowser/filebrowser:latest'
+    environment:
+      - SERVICE_FQDN_FILEBROWSER_80
+    volumes:
+      - 'wordpress-files:/srv'
+      -
+        type: bind
+        source: ./database.db
+        target: /database.db
+        isDirectory: false
+        content: ''
+      -
+        type: bind
+        source: ./filebrowser.json
+        target: /.filebrowser.json
+        read_only: true
+        content: |-
+          {
+            "address": "0.0.0.0",
+            "port": 80,
+            "database": "/database.db",
+            "root": "/srv"
+          }
+    depends_on:
+      - wordpress
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1:80'
+      interval: 2s
+      timeout: 10s
+      retries: 15

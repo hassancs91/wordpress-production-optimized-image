@@ -1,0 +1,153 @@
+version: '3.8'
+services:
+  mariadb:
+    image: 'bitnami/mariadb:latest'
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: '${MARIADB_ROOT_PASSWORD}'
+      MARIADB_DATABASE: '${MARIADB_DATABASE}'
+      MARIADB_USER: '${MARIADB_USER}'
+      MARIADB_PASSWORD: '${MARIADB_PASSWORD}'
+      MARIADB_CHARACTER_SET: utf8mb4
+      MARIADB_COLLATE: utf8mb4_unicode_ci
+      MARIADB_EXTRA_FLAGS: >-
+        --max_allowed_packet=512M
+        --innodb_buffer_pool_size=2G
+        --innodb_log_file_size=256M
+        --query_cache_size=32M
+        --query_cache_type=1
+        --tmp_table_size=128M
+        --max_heap_table_size=128M
+        --innodb_flush_log_at_trx_commit=2
+        --max_connections=151
+        --thread_cache_size=8
+
+    volumes:
+      - 'mariadb_data:/bitnami/mariadb'
+    networks:
+      - wordpress_network
+    healthcheck:
+      test:
+        - CMD
+        - /opt/bitnami/scripts/mariadb-1/healthcheck.sh
+      interval: 15s
+      timeout: 5s
+      retries: 6
+  wordpress:
+    image: 'bitnami/wordpress-nginx:latest'
+    restart: unless-stopped
+    depends_on:
+      - mariadb
+    environment:
+      WORDPRESS_DATABASE_HOST: mariadb
+      WORDPRESS_DATABASE_PORT_NUMBER: 3306
+      WORDPRESS_DATABASE_USER: '${MARIADB_USER}'
+      WORDPRESS_DATABASE_PASSWORD: '${MARIADB_PASSWORD}'
+      WORDPRESS_DATABASE_NAME: '${MARIADB_DATABASE}'
+      WORDPRESS_USERNAME: '${WORDPRESS_USERNAME}'
+      WORDPRESS_PASSWORD: '${WORDPRESS_PASSWORD}'
+      WORDPRESS_EMAIL: '${WORDPRESS_EMAIL}'
+      WORDPRESS_BLOG_NAME: '${WORDPRESS_BLOG_NAME}'
+      WORDPRESS_TABLE_PREFIX: '${WORDPRESS_TABLE_PREFIX}'
+      WORDPRESS_ENABLE_XML_RPC: '${WORDPRESS_ENABLE_XML_RPC}'
+      WORDPRESS_ENABLE_REVERSE_PROXY: '${WORDPRESS_ENABLE_REVERSE_PROXY}'
+      WORDPRESS_AUTO_UPDATE_LEVEL: minor
+      WORDPRESS_DATA_TO_PERSIST: 'wp-config.php wp-content'
+      WORDPRESS_RESET_DATA_PERMISSIONS: 'no'
+      WORDPRESS_AUTH_KEY: '${WORDPRESS_AUTH_KEY}'
+      WORDPRESS_SECURE_AUTH_KEY: '${WORDPRESS_SECURE_AUTH_KEY}'
+      WORDPRESS_LOGGED_IN_KEY: '${WORDPRESS_LOGGED_IN_KEY}'
+      WORDPRESS_NONCE_KEY: '${WORDPRESS_NONCE_KEY}'
+      WORDPRESS_AUTH_SALT: '${WORDPRESS_AUTH_SALT}'
+      WORDPRESS_SECURE_AUTH_SALT: '${WORDPRESS_SECURE_AUTH_SALT}'
+      WORDPRESS_LOGGED_IN_SALT: '${WORDPRESS_LOGGED_IN_SALT}'
+      WORDPRESS_NONCE_SALT: '${WORDPRESS_NONCE_SALT}'
+
+      # === PHP Performance ===
+      PHP_ENABLE_OPCACHE: yes
+      PHP_OPCACHE_MEMORY_CONSUMPTION: 256    # MB of RAM for cached code
+      PHP_OPCACHE_MAX_ACCELERATED_FILES: 10000  # Number of files to cache
+      PHP_OPCACHE_REVALIDATE_FREQ: 60       # How often to check for changes (0=always)
+      PHP_OPCACHE_VALIDATE_TIMESTAMPS: yes    # Check file timestamps
+      
+      # === PHP Limits ===
+      PHP_MEMORY_LIMIT: 512M                  # RAM per PHP process
+      PHP_MAX_EXECUTION_TIME: 600             # Max script runtime (seconds)
+      PHP_MAX_INPUT_TIME: 600                 # Max input parsing time
+      PHP_MAX_INPUT_VARS: 10000               # Form fields limit
+      PHP_POST_MAX_SIZE: 128M                 # Max POST data
+      PHP_UPLOAD_MAX_FILESIZE: 128M          # Max file upload
+
+
+
+      # === WordPress Debug (disable in production) ===
+      WORDPRESS_DEBUG: no
+      WORDPRESS_DEBUG_LOG: no
+      WORDPRESS_DEBUG_DISPLAY: no
+
+    volumes:
+      - 'wordpress_data:/bitnami/wordpress'
+    networks:
+      - wordpress_network
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1:8080'
+      interval: 15s
+      timeout: 5s
+      retries: 6
+  phpmyadmin:
+    image: 'phpmyadmin/phpmyadmin:latest'
+    environment:
+      - SERVICE_FQDN_PHPMYADMIN_80
+      - PMA_HOST=mariadb
+    depends_on:
+      - mariadb
+    networks:
+      - wordpress_network
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1'
+      interval: 2s
+      timeout: 10s
+      retries: 15
+  filebrowser:
+    image: 'filebrowser/filebrowser:latest'
+    environment:
+      - SERVICE_FQDN_FILEBROWSER_80
+    volumes:
+      - 'wordpress_data:/srv'
+      -
+        type: bind
+        source: ./database.db
+        target: /database.db
+        isDirectory: false
+        content: ''
+      -
+        type: bind
+        source: ./filebrowser.json
+        target: /.filebrowser.json
+        read_only: true
+        content: "{\n  \"address\": \"0.0.0.0\",\n  \"port\": 80,\n  \"database\": \"/database.db\",\n  \"root\": \"/srv\"\n}"
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1:80'
+      interval: 2s
+      timeout: 10s
+      retries: 15
+volumes:
+  mariadb_data:
+    driver: local
+  wordpress_data:
+    driver: local
+networks:
+  wordpress_network:
+    driver: bridge

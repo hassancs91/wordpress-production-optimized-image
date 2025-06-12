@@ -1,0 +1,90 @@
+version: '3.8'
+services:
+  mariadb:
+    image: 'bitnami/mariadb:latest'
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: '${MARIADB_ROOT_PASSWORD}'
+      MARIADB_DATABASE: '${MARIADB_DATABASE}'
+      MARIADB_USER: '${MARIADB_USER}'
+      MARIADB_PASSWORD: '${MARIADB_PASSWORD}'
+      MARIADB_CHARACTER_SET: utf8mb4
+      MARIADB_COLLATE: utf8mb4_unicode_ci
+      MARIADB_EXTRA_FLAGS: '${MARIADB_EXTRA_FLAGS}'
+    volumes:
+      - '/mnt/data/mariadb-site1:/bitnami/mariadb'
+    networks:
+      - wordpress_network
+    healthcheck:
+      test:
+        - CMD
+        - /opt/bitnami/scripts/mariadb-1/healthcheck.sh
+      interval: 15s
+      timeout: 5s
+      retries: 6
+  wordpress:
+    image: 'bitnami/wordpress-nginx:latest'
+    restart: unless-stopped
+    depends_on:
+      - mariadb
+    environment:
+      WORDPRESS_DATABASE_HOST: mariadb
+      WORDPRESS_DATABASE_PORT_NUMBER: 3306
+      WORDPRESS_DATABASE_USER: '${MARIADB_USER}'
+      WORDPRESS_DATABASE_PASSWORD: '${MARIADB_ROOT_PASSWORD}'
+      WORDPRESS_DATABASE_NAME: '${MARIADB_DATABASE}'
+      WORDPRESS_USERNAME: '${WORDPRESS_USERNAME}'
+      WORDPRESS_PASSWORD: '${WORDPRESS_PASSWORD}'
+      WORDPRESS_EMAIL: '${WORDPRESS_EMAIL}'
+      WORDPRESS_BLOG_NAME: '${WORDPRESS_BLOG_NAME}'
+      WORDPRESS_TABLE_PREFIX: '${WORDPRESS_TABLE_PREFIX}'
+      WORDPRESS_ENABLE_XML_RPC: '${WORDPRESS_ENABLE_XML_RPC}'
+      WORDPRESS_ENABLE_REVERSE_PROXY: '${WORDPRESS_ENABLE_REVERSE_PROXY}'
+      WORDPRESS_AUTO_UPDATE_LEVEL: minor
+      WORDPRESS_DATA_TO_PERSIST: 'wp-config.php wp-content'
+      WORDPRESS_RESET_DATA_PERMISSIONS: 'no'
+      WORDPRESS_AUTH_KEY: '${WORDPRESS_AUTH_KEY}'
+      WORDPRESS_SECURE_AUTH_KEY: '${WORDPRESS_SECURE_AUTH_KEY}'
+      WORDPRESS_LOGGED_IN_KEY: '${WORDPRESS_LOGGED_IN_KEY}'
+      WORDPRESS_NONCE_KEY: '${WORDPRESS_NONCE_KEY}'
+      WORDPRESS_AUTH_SALT: '${WORDPRESS_AUTH_SALT}'
+      WORDPRESS_SECURE_AUTH_SALT: '${WORDPRESS_SECURE_AUTH_SALT}'
+      WORDPRESS_LOGGED_IN_SALT: '${WORDPRESS_LOGGED_IN_SALT}'
+      WORDPRESS_NONCE_SALT: '${WORDPRESS_NONCE_SALT}'
+    volumes:
+      - '/mnt/data/wordpress-site1:/bitnami/wordpress'
+    networks:
+      - wordpress_network
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1:8080'
+      interval: 15s
+      timeout: 5s
+      retries: 6
+  phpmyadmin:
+    image: 'phpmyadmin/phpmyadmin:latest'
+    environment:
+      - SERVICE_FQDN_PHPMYADMIN_80
+      - PMA_HOST=mariadb
+    depends_on:
+      - mariadb
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1'
+      interval: 2s
+      timeout: 10s
+      retries: 15
+volumes:
+  mariadb_data:
+    driver: local
+  wordpress_data:
+    driver: local
+networks:
+  wordpress_network:
+    driver: bridge
